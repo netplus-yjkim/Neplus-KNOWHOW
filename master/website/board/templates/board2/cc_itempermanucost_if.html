@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+      // https://docs.djangoproject.com/en/3.1/ref/csrf/
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    var csrftoken = getCookie('csrftoken');
+
+    var xhr;
+
+    function downloadTemplate()
+    {
+        var strurl = "http://223.194.46.212:8757/rest_api/cc-item-per-manu-cost-if"
+
+        xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == 4) {
+                var blob = this.response;
+                var fileName = "itempermanucost.xlsx"
+
+                var downloadLink = window.document.createElement('a');
+                var contentTypeHeader = xhr.getResponseHeader("Content-Type");
+                downloadLink.href = window.URL.createObjectURL(new Blob([blob], { type: contentTypeHeader }));
+                downloadLink.download = fileName;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+
+            }
+        };
+        xhr.open("GET", strurl);
+        xhr.responseType = 'blob';
+        xhr.setRequestHeader("X-CSRFToken", csrftoken);
+        xhr.send(null);
+    }
+
+      function uploadTemplate()
+      {
+          const file = document.getElementById("input_file").files[0];
+
+          if(file == null) {
+              alert('파일를 업로드 해주십시오.');
+              document.getElementById("input_file").focus();
+              return false;
+          }
+
+          const formData = new FormData();
+          formData.append('input_file', file);
+
+          xhr = new XMLHttpRequest();
+          xhr.onreadystatechange = function() {
+              if (xhr.readyState == 4) {
+                  if(xhr.status==201)
+                      alert("파일 업로드가 완료되었습니다.");
+                  location.reload();
+              }
+              else {
+                  if(xhr.status==400) {
+                      alert("400 Bad Request");
+                  }
+              }
+          };
+
+          var strurl = "http://223.194.46.212:8757/rest_api/cc-item-per-manu-cost-if";
+          xhr.open("POST", strurl, true);
+          xhr.setRequestHeader("X-CSRFToken", csrftoken);
+          //xhr.setRequestHeader("Content-Type", "multipart/form-data");
+          xhr.send(formData);
+      }
+
+
+      function verifyDB()
+      {
+          var strurl = "http://223.194.46.212:8757/rest_api/db-name"
+
+          xhr = new XMLHttpRequest();
+          xhr.onreadystatechange = function() {
+              if (xhr.readyState == 4) {
+                  if(xhr.status==200)
+                      alert("현재 연결된 DB : " + xhr.response);
+              }
+              else {
+                  if(xhr.status==400) {
+                      alert("400 Bad Request");
+                  }
+              }
+          };
+          xhr.open("GET", strurl);
+          xhr.setRequestHeader("X-CSRFToken", csrftoken);
+          xhr.send(null);
+      }
+
+      function uploadDB()
+      {
+
+          xhr = new XMLHttpRequest();
+          xhr.onreadystatechange = function() {
+              if (xhr.readyState == 4) {
+                  if(xhr.status==201)
+                      alert("DB 업로드가 완료되었습니다.");
+                      location.reload();
+              }
+              else {
+                  if(xhr.status==400) {
+                      alert("400 Bad Request");
+                  }
+              }
+          };
+
+          var strurl = "http://223.194.46.212:8757/rest_api/cc-item-per-manu-cost-if-db";
+          xhr.open("POST", strurl, true);
+          xhr.setRequestHeader("X-CSRFToken", csrftoken);
+          xhr.send(null);
+      }
+
+
+</script>
+{% endblock %}
+
+{% block body %}
+
+{% include "navbar.html" %}
+{% include "sidebar.html" %}
+
+<!--main content start-->
+<section id="main-content">
+    <section class="wrapper">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3 class="page-header"><i class="fa fa-table"></i>품목별 제조비용 I/F</h3>
+            </div>
+        </div>
+        <div align="right" style="margin-right:2px">
+            <table>
+                    <tr>
+                        <td>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="verifyDB()">현재 연결된 DB 확인</button>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-primary btn-sm" disabled onclick="uploadDB()">연결된 DB를 통한 데이터 업로드</button>
+                        </td>
+                    </tr>
+                </table>
+        </div>
+        <br>
+        <div align="right" style="margin-right:2px">
+            <a class="btn btn-primary btn-sm" href="javascript:void(0);" onclick="downloadTemplate()" title="Bootstrap 3 themes generator">Template 다운로드</a>
+        </div>
+        <div align="right" style="margin-top:2px">
+            <form method="POST" enctype="multipart/form-data" action="cc_itempermanucost_if/itempermanucostdata_upload">
+                {% csrf_token %}
+                <table>
+                    <tr>
+                        <td>
+                            <input id="input_file" type="file" name="ufile" accept=".xlsx" style="width:200px">
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="uploadTemplate()">액셀업로드</button>
+                        </td>
+                    </tr>
+                </table>
+            </form>
+        </div>
+        <br>
+        <div class="row">
+            <div class="col-lg-12">
+                <section class="panel">
+                    <div class="table-responsive">
+                        {% if rsItempermanucost %}
+                        <table class="table">
+                            <thead>
+                            <tr>
+                                <th>법인코드</th>
+                                <th>법인명</th>
+                                <th>년월</th>
+                                <th>version</th>
+                                <th>모품목코드</th>
+                                <th>모품목명</th>
+                                <th>계정코드</th>
+                                <th>계정명</th>
+                                <th>금액</th>
+                            </tr>
+                            </thead>
+                            {% for i in rsItempermanucost %}
+                            <tbody>
+                            <tr>
+                                <td>
+                                    {{ i.co_cd }}
+                                </td>
+                                <td>
+                                    {{ i.co_nm }}
+                                </td>
+                                <td>
+                                    {{ i.ipmc_ym }}
+                                </td>
+                                <td>
+                                    {{ i.version_cd }}
+                                </td>
+                                <td>
+                                    {{ i.bom_cd }}
+                                </td>
+                                <td>
+                                    {{ i.item_nm }}
+                                </td>
+                                <td>
+                                    {{ i.accnt_cd }}
+                                </td>
+                                <td>
+                                    {{ i.accnt_nm }}
+                                </td>
+                                <td>
+                                    {{ i.ipmc_cost }}
+                                </td>
+                            </tr>
+                            </tbody>
+                            {% endfor %}
+                        </table>
+                        {% else %}
+                        <div> 데이터를 업로드 해주세요</div>
+                        {% endif %}
+                    </div>
+                </section>
+            </div>
+        </div>
+
+
+        <div class="panel panel-default">
+            <div class="panel-heading" role="tab">
+                <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapse1" aria-expanded="false">
+                    *Code Information
+                </a>
+            </div>
+            <div id="collapse1" class="panel-collapse collapse" role="tabpanel">
+                <div class="panel-body">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th>
+                                법인코드
+                            </th>
+                            <th>
+                                version코드
+                            </th>
+                            <th>
+                                계정코드
+                            </th>
+                            <th>
+                                BOM코드
+                            </th>
+                        </tr>
+                        <tbody>
+                        <tr>
+                            <td>
+                                {% for i in rsCo %}
+                                <div>{{ i.id }}. {{ i.co_cd }} - {{ i.co_nm }}</div>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% for i in rsVersion %}
+                                <div>{{ i.id }}. {{ i.version_cd }}</div>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% for i in rsCosteleaccnt %}
+                                <div>{{ i.id }}. {{ i.accnt_cd }} - {{ i.accnt_nm }}</div>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% for i in rsBom %}
+                                <div>{{ i.id }}. {{ i.item_cd }}</div>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </section>
+    <!--main content end-->
+</section>
+<!-- container section start -->
+{% endblock %}

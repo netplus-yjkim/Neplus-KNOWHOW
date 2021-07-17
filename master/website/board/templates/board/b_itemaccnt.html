@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block scripts %}
+    {{ block.super }}
+    <script>
+         // https://docs.djangoproject.com/en/3.1/ref/csrf/
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        var csrftoken = getCookie('csrftoken');
+        var xhr;
+
+        function insertItemaccnt() {
+            var itemaccntCd = document.getElementById('itemaccnt_cd').value;
+            if (itemaccntCd == '') {
+                alert('Code empty');
+                document.getElementById('itemaccnt_cd').focus();
+                return false;
+            }
+
+            var itemaccntNm = document.getElementById('itemaccnt_nm').value;
+            if (itemaccntNm == '') {
+                alert('Name empty');
+                document.getElementById('itemaccnt_nm').focus();
+                return false;
+            }
+
+            var payload = {
+                "itemaccnt_cd": itemaccntCd,
+                "itemaccnt_nm": itemaccntNm
+            };
+
+            xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4) {
+                    if (xhr.status == 201)
+                        alert("생성이 완료되었습니다.");
+                    location.reload();
+                } else {
+                    if (xhr.status == 400) {
+                        var data = xhr.responseText;
+                        var obj = JSON.parse(data);
+
+                         if (obj.detail == "DuplicateCode") {
+                             alert("품목 계정 코드가 이미 존재합니다.");
+                         } else {
+                            alert("400 Bad Request");
+                        }
+                    }
+                }
+            };
+
+            var strurl = "http://223.194.46.212:8757/rest_api/item-accounts";
+            xhr.open("POST", strurl, true);
+            xhr.setRequestHeader("X-CSRFToken", csrftoken);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.send(JSON.stringify(payload));
+        }
+
+        function delete_element(elem) {
+             var id = elem.getAttribute('name');
+
+             if (!confirm("삭제 하시겠습니까")) {
+                 return false;
+             }
+
+             xhr = new XMLHttpRequest();
+             xhr.onreadystatechange = function () {
+                 if (xhr.readyState == 4) {
+                     if (xhr.status == 204)
+                         alert("삭제가 완료되었습니다.");
+                     location.reload();
+                 } else {
+                     if (xhr.status == 400) {
+                         var data = xhr.responseText;
+                         var obj = JSON.parse(data);
+
+                         if (obj.detail == "") {//추후 에러처리 추가시 사용
+                             alert("에러코드");
+                         } else {
+                             alert("400 Bad Request");
+                         }
+                     }
+                 }
+             };
+
+             var strurl = "http://223.194.46.212:8757/rest_api/item-accounts/" + id;
+             xhr.open("DELETE", strurl, true);
+             xhr.setRequestHeader("X-CSRFToken", csrftoken);
+             xhr.setRequestHeader("Content-Type", "application/json");
+             xhr.send(null);
+         }
+
+        function updateName(elem) {
+            var accntId = elem.getAttribute('name');
+
+            var itemaccntCd = document.getElementById('itemaccnt_cd' + accntId).innerText;
+            var value = elem.value;
+
+            if (value == '') {
+                alert('Value empty');
+                elem.focus();
+                return false;
+            }
+
+            var payload = {
+                "itemaccnt_cd": itemaccntCd,
+                "itemaccnt_nm": value
+            };
+
+            xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4) {
+                    if (xhr.status == 200)
+                        alert("수정이 완료되었습니다.");
+                    location.reload();
+                } else {
+                    if (xhr.status == 400) {
+                        var data = xhr.responseText;
+                        var obj = JSON.parse(data);
+
+                        if (obj.detail == "") {//추후 에러처리 추가시 사용
+                            alert("에러코드");
+                        } else {
+                            alert("400 Bad Request");
+                        }
+                    }
+                }
+            };
+
+            var strurl = "http://223.194.46.212:8757/rest_api/item-accounts/" + accntId;
+            xhr.open("PUT", strurl, true);
+            xhr.setRequestHeader("X-CSRFToken", csrftoken);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.send(JSON.stringify(payload));
+        }
+
+    </script>
+{% endblock %}
+
+{% block body %}
+
+    {% include "navbar.html" %}
+    {% include "sidebar.html" %}
+
+    <!--main content start-->
+    <section id="main-content">
+        <section class="wrapper">
+            <div class="row">
+                <div class="col-lg-12">
+                    <h3 class="page-header"><i class="fa fa-table"></i>품목계정</h3>
+                </div>
+            </div>
+            <div>
+                <table>
+                    <thead>
+                        <tr>
+                            <td width="" align="center">품목계정코드</td>
+                            <td width="" align="center">품목계정명</td>
+                            </td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <input type="text" id="itemaccnt_cd" class="form-control" placeholder="Itemaccnt Code">
+                            </td>
+                            <td>
+                                <input type="text" id="itemaccnt_nm" class="form-control" placeholder="Itemaccnt Name">
+                            </td>
+                            <td>
+                                <button onclick="insertItemaccnt();" class="btn btn-primary btn-sm">등록</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <br>
+
+            <div class="row">
+                <div class="col-lg-12">
+                    <section class="panel">
+                        <div class="table-responsive">
+                            {% if rsItemaccnt %}
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>품목계정코드</th>
+                                        <th>품목계정명</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {% for i in rsItemaccnt %}
+                                    <tr>
+                                        <td id="itemaccnt_cd{{i.id}}" width="20%">{{ i.itemaccnt_cd }}</td>
+                                        <td width="20%">
+                                            <input type="text" class="form-control" name="{{ i.id }}" value="{{ i.itemaccnt_nm }}" onchange="updateName(this)"/>
+                                        </td>
+                                        <td align="right">
+                                            <button class="btn btn-default btn-sm" id="delete_{{i.id}}" name="{{i.id}}" onclick="delete_element(this);">삭제</button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            {% else %}
+                            <span> Itemaccount가 없습니다. </span>
+                            {% endif %}
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </section>
+        <!--main content end-->
+    </section>
+    <!-- container section start -->
+
+{% endblock %}

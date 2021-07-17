@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+      // https://docs.djangoproject.com/en/3.1/ref/csrf/
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    var csrftoken = getCookie('csrftoken');
+
+    var xhr;
+
+    function searchCostbill()
+    {
+        itemcd = document.getElementById('itemcd').value;
+        date = document.getElementById('date').value;
+        if(date == '')
+        {
+            document.getElementById('date').style.backgroundColor = "#DDEEFF";
+            document.getElementById('date').focus();
+            return false;
+        }
+        if(date.length < 6)
+        {
+            alert('날짜길이를 확인해주세요. 6자리');
+
+            document.getElementById('date').style.backgroundColor = "#DDEEFF";
+            document.getElementById('date').focus();
+            return false;
+
+        }
+        else
+        {
+            var strurl = "?itemcd="+ itemcd + "&periodcd=" + date;
+            location.href = strurl;
+        }
+    }
+    function maxLengthCheck(object){
+    if (object.value.length > object.maxLength){
+      object.value = object.value.slice(0, object.maxLength);
+    }
+  }
+</script>
+{% endblock %}
+
+{% block body %}
+
+{% include "navbar.html" %}
+{% include "sidebar.html" %}
+{% load humanize %}
+<!--main content start-->
+<section id="main-content">
+    <section class="wrapper">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3 class="page-header"><i class="fa fa-table"></i>원가 계산서 I/F</h3>
+            </div>
+        </div>
+        <div class='row'>
+            <div class="col-lg-12">
+                <div class="table-responsive">
+                    <table>
+                        <tr>
+                            <td width="20%">
+                                <i>버전
+                                    <select class="form-control" onchange="location = this.value;">
+                                        {% for i in rsVersioncd %}
+                                        {% if i.version_cd == versioncd %}
+                                        <option value="?versioncd={{ i.version_cd }}" selected>{{ i.version_cd }}</option>
+                                        {% else %}
+                                        <option value="?versioncd={{ i.version_cd }}">{{ i.version_cd }}</option>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </i>
+                            </td>
+                            <td width="10%" align="right"><br>조회설정:&nbsp&nbsp&nbsp&nbsp </td>
+                            <td width="20%">
+                                <i>모델명
+                                    <select class="form-control" id="itemcd">
+                                        <option value="">-----SELECT-----</option>
+                                        {% for i in rsItemcd %}
+                                        {% if i.모델명 == itemcd %}
+                                        <option value="{{ i.item_cd }}" selected>{{ i.모델명 }}</option>
+                                        {% else %}
+                                        <option value="{{ i.item_cd }}">{{ i.모델명 }}</option>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </i>
+                            </td>
+                            <td width="20%">
+                                <i>날짜
+                                    <input type="number" maxlength="6" class="form-control" id="date" placeholder="YYYYMM" oninput="maxLengthCheck(this)" value="{{ periodcd }}">
+                                </i>
+                            </td>
+                            <td width="20%">
+                                <br>
+                                <button class="btn btn-primary btn-sm" onclick="searchCostbill()">조회</button>
+                            </td>
+                            <td>
+                                <br>
+                                <h5>(단위:KRW)</h5>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <br>
+        <div class="row">
+            <div class="col-lg-12">
+                <section class="panel">
+                    <div class="table-responsive">
+                        {% if rsCostbill1 %}
+                        <table class="table">
+                            <thead>
+                            <tr style=" background-color: #bbdefb;">
+                                <th width="20%">모델명</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.모델명}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr style="background-color: #e3f2fd;">
+                                <th>생산량</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.생산량|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr style=" background-color: #bbdefb;">
+                                <th>표준단가</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.단가|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr style="background-color: #e3f2fd;">
+                                <th>매출액</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.매출|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr style=" background-color: #bbdefb;">
+                                <th>기초재공품재료비</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.기초제공품합계|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr  style="background-color: #e3f2fd;">
+                                <th>당기투입재료비</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.당기투입재료비|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr  style="background-color: #e3f2fd;">
+                                <th>당기투입노무비소계</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.당기투입노무비합|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr  style="background-color: #e3f2fd;">
+                                <th>당기투입제조경비소계</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.당기투입제조경비합|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr  style="background-color: #e3f2fd;">
+                                <th>당기투입합계</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.당기투입합계|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr style=" background-color: #bbdefb;">
+                                <th>당기사용재료비</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.당기사용재료비|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr style=" background-color: #bbdefb;">
+                                <th>당기사용노무비소계</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.당기사용제조원가총액|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr style=" background-color: #bbdefb;">
+                                <th>당기사용제조경비소계</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.당기사용제조경비합|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr style=" background-color: #bbdefb;">
+                                <th>당기사용제조원가합계</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.당기사용제조원가총액|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr style="background-color: #e3f2fd;">
+                                <th>타계정으로대체재료비</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.타계정으로대체재료비|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr style=" background-color: #bbdefb;">
+                                <th>기말재공품재료비</th>
+                                {% for i in rsCostbill1 %}
+                                <td>
+                                    {{i.기말제공품합계|intcomma}}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            </thead>
+                        </table>
+                        {% else %}
+                        <div> 데이터를 업로드 해주세요</div>
+                        {% endif %}
+                    </div>
+                </section>
+            </div>
+        </div>
+    </section>
+    <!--main content end-->
+</section>
+<!-- container section start -->
+{% endblock %}

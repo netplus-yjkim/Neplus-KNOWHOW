@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}
+simulate
+{% endblock %}
+
+
+{% block body %}
+
+{% include "navbar.html" %}
+{% include "sidebar.html" %}
+
+<div aria-hidden="true" aria-labelledby="myModalLabel" role="dialog" tabindex="-1" id="myModal" class="modal fade">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button aria-hidden="true" data-dismiss="modal" class="close" type="button">×</button>
+                <h4 class="modal-title">환율 그래프</h4>
+            </div>
+            <div class="modal-body" align="center">
+                <img src="{{graph}}" width="500px">
+            </div>
+        </div>
+    </div>
+</div>
+
+<section id="main-content">
+    <section class="wrapper">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3 class="page-header"><i class="fa fa-desktop"></i>Simulate</h3>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-3 col-md-3 col-sm-12 col-xs-12">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h2><strong>환율</strong></h2>
+                    </div>
+                    <div class="info-box blue-bg" onclick="location.href='#';" data-target="#myModal" data-toggle="modal">
+                        <i class="fa fa-krw"></i>
+                        <div class="count">{{price}}</div>
+                        <div class="title">미국USD</div>
+                    </div>
+                </div>
+                <!--/.info-box-->
+            </div>
+            <!--/.col-->
+            <div class="col-lg-3 col-md-3 col-sm-12 col-xs-12">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h2><strong>기준금리</strong></h2>
+                    </div>
+                    <div class="info-box brown-bg" onclick="#">
+                        <i class="fa fa-money"></i>
+                        <div class="count">{{interestRate}}&nbsp%</div>
+                        <div class="title">기준금리&nbsp(콜&nbsp금리)</div>
+                    </div>
+                </div>
+                <!--/.info-box-->
+            </div>
+            <!--/.col-->
+        </div>
+
+        <div class="row">
+            <div class="col-lg-11 col-md-12">
+
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h2><i class="icon_piechart"></i><strong>예측데이터</strong></h2>
+                        <div class="panel-actions">
+                            <a href="#" class="btn-setting"><i class="fa fa-rotate-right"></i></a>
+                            <a href="#" class="btn-minimize"><i class="fa fa-chevron-up"></i></a>
+                            <a href="#" class="btn-close"><i class="fa fa-times"></i></a>
+                        </div>
+                    </div>
+                    <section class="panel">
+                        <div class="panel-body text-center">
+                            <canvas height="300" width="1500" id="simul_canvas"></canvas>
+                        </div>
+                    </section>
+
+                </div>
+            </div>
+            <div class="col-md-1">
+                <i><strong>변동비%</strong></i><input type="number" id="variable" class="form-control">
+                <br>
+                <i><strong>고정비%</strong></i><input type="number" id="fixed" class="form-control">
+                <br>
+                <i><strong>재료비%</strong></i><input type="number" id="material" class="form-control">
+                <br>
+                <button class="btn btn-default btn-lg" onclick="insertData();">예측</button>
+            </div>
+
+        </div>
+    </section>
+    <!--main content end-->
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js"></script>
+<script>
+    var simul_canvas = document.getElementById('simul_canvas').getContext('2d');
+    var simul_data;
+    var simul_opt;
+    var simul_chart;
+    var strurl = "";
+
+    var period_list = new Array(8);
+    var cost_list = [];
+    var predict_max = [];
+    var predict_min = [];
+
+    var this_year = 2021;
+    var this_month = 1;
+
+    var csrftoken = getCookie('csrftoken');
+    function getCookie(name) {
+        var cookieValue = null;
+
+        if (document.cookie && document.cookie !== '') {
+            var cookies = document.cookie.split(';');
+
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = jQuery.trim(cookies[i]);
+
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    var xhr_costbill = new XMLHttpRequest();
+    xhr_costbill.onreadystatechange = function() {
+        if (xhr_costbill.readyState == 4) {
+            if (xhr_costbill.status == 200) {
+                var data = xhr_costbill.responseText;
+                var json_data = JSON.parse(data);
+                var temp_period = [];
+
+                for (var i = 0; i < json_data.length; i++) {
+                    temp_period[i] = json_data[i]['periodym_cd'];
+                }
+                var item_set = new Set(temp_period);
+                temp_period = [...item_set];
+                temp_period.sort();
+
+                for (var i = 1; i <= 8; i++) {
+                    period_list[period_list.length - i] = temp_period[temp_period.length - i];
+                    cost_list[i - 1] = 0;
+                }
+
+                for (var i = 0; i < json_data.length; i++) {
+                    var idx = period_list.indexOf(json_data[i]['periodym_cd']);
+
+                    if (idx == -1)
+                        continue;
+
+                    cost_list[idx] += (json_data[i]['proq'] * json_data[i]['proamt_unit']);
+                    predict_max[idx] = cost_list[idx];
+                    predict_min[idx] = cost_list[idx];
+                }
+
+                for (var i = 0; i <= period_list.length - 1; i++) {
+                    period_list[i] = Math.floor(period_list[i]/100) + "." + period_list[i]%100;
+                }
+
+                strurl = "http://223.194.46.212:8757/rest_api/ca-prediction_simulation";
+                xhr_prediction.open("GET", strurl, true);
+                xhr_prediction.setRequestHeader("X-CSRFToken", csrftoken);
+                xhr_prediction.setRequestHeader("Content-Type", "application/json");
+                xhr_prediction.send(null);
+            }
+        } else {
+            if (xhr_costbill.status == 400) {
+                var data = xhr_costbill.responseText;
+                var obj = JSON.parse(data);
+            }
+        }
+    };
+
+    var xhr_prediction = new XMLHttpRequest();
+    xhr_prediction.onreadystatechange = function() {
+        if (xhr_prediction.readyState == 4) {
+            if (xhr_prediction.status == 200) {
+                // GET 요청 답변
+                var data = xhr_prediction.responseText;
+                var json_data = JSON.parse(data);
+
+                for (var i = 1; i <= 4; i++) {
+                    var ym = json_data['periodym' + i + '_cd'];
+                    period_list[7 + i] = Math.floor(ym / 100) + "." + (ym % 100);
+                    cost_list[7 + i] = json_data['prediction' + i + '_cost'];
+                    predict_max[7 + i] = json_data['prediction' + i + '_max'];
+                    predict_min[7 + i] = json_data['prediction' + i + '_min'];
+                }
+
+                initialize_chart_data();
+                draw_chart();
+            } else if (xhr_prediction.status == 201) {
+                // POST 요청 답변
+                var data = xhr_prediction.responseText;
+                var json_data = JSON.parse(data);
+
+                location.reload();
+            }
+        } else {
+            if (xhr_prediction.status == 400) {
+                var data = xhr_prediction.responseText;
+                var obj = JSON.parse(data);
+            }
+        }
+    };
+
+    window.onload = function () {
+        strurl = "http://223.194.46.212:8757/rest_api/costbill";
+        xhr_costbill.open("GET", strurl, true);
+        xhr_costbill.setRequestHeader("X-CSRFToken", csrftoken);
+        xhr_costbill.setRequestHeader("Content-Type", "application/json");
+        xhr_costbill.send(null);
+    }
+
+    function insertData() {
+        var variable = document.getElementById('variable').value;
+        var fixed = document.getElementById('fixed').value;
+        var material = document.getElementById('material').value;
+
+        var payload = {
+            "prediction1_cost": 0,
+            "prediction2_cost": 0,
+            "prediction3_cost": 0,
+            "prediction4_cost": 0,
+            "periodym1_cd": 0,
+            "periodym2_cd": 0,
+            "periodym3_cd": 0,
+            "periodym4_cd": 0,
+            "variableperc_cost": variable,
+            "fixedperc_cost": fixed,
+            "materialperc_cost": material,
+            "prediction1_max": 0,
+            "prediction2_max": 0,
+            "prediction3_max": 0,
+            "prediction4_max": 0,
+            "prediction1_min": 0,
+            "prediction2_min": 0,
+            "prediction3_min": 0,
+            "prediction4_min": 0
+        };
+
+        var strurl = "http://223.194.46.212:8757/rest_api/ca-prediction_simulation";
+        xhr_prediction.open("POST", strurl, true);
+        xhr_prediction.setRequestHeader("X-CSRFToken", csrftoken);
+        xhr_prediction.setRequestHeader("Content-Type", "application/json");
+        xhr_prediction.send(JSON.stringify(payload));
+    }
+
+    function initialize_chart_data() {
+        simul_data = {
+            labels: period_list,
+            datasets: [{
+                label: "매출액",
+                fill: '+2',
+                backgroundColor: 'rgba(202, 171, 241, 0.3)',
+                borderColor: '#62879A',
+                lineTension: 0,
+                borderWidth: 2,
+                pointRadius: 0,
+                data: cost_list
+            }, {
+                label: "매출액 예측 최대",
+                fill: '-1',
+                backgroundColor: 'rgba(202, 171, 241, 0.3)',
+                borderColor: 'transparent',
+                pointRadius: 0,
+                data: predict_max
+            }, {
+                label: "매출액 예측 최소",
+                backgroundColor: 'rgba(221, 255, 255, 0.3)',
+                borderColor: 'transparent',
+                pointRadius: 0,
+                fill: 'origin',
+                data: predict_min
+            }]
+        };
+        simul_opt = {
+            responsive: false,
+            legend: {
+                display: false
+            },
+            elements: {
+                line: {
+                    tension: 0.1
+                }
+            },
+            plugins: {
+                filler: {
+                    propagate: false
+                }
+            },
+            scales: {
+                xAxes: [{
+                    ticks: {
+                        autoSkip: false,
+                        padding: 10
+                    },
+                    gridLines: {
+                        drawTicks: false,
+                        borderDash: [5, 4]
+                    },
+                    scaleLabel: {
+                        display: true,
+                        labelString: '기간(월)'
+                    }
+                }],
+                yAxes: [{
+                    ticks: {
+                        padding: 10
+                    },
+                    gridLines: {
+                        drawTicks: false,
+                    },
+                    scaleLabel: {
+                        display: true,
+                        labelString: '매출액(원)'
+                    }
+                }]
+            },
+            tooltips: {
+                mode: 'index',
+                intersect: false,
+            }
+        };
+
+        var gridLinesColor = new Array(period_list.length);
+        var gridLineWidth = new Array(period_list.length);
+
+        for (var i = 1; i <= period_list.length; i++) {
+            if (i == 5) {
+                gridLinesColor[gridLinesColor.length - i] = 'red';
+                gridLineWidth[gridLineWidth.length - i] = 3;
+
+            }
+            else {
+                gridLinesColor[gridLinesColor.length - i] = '#E0E0E0';
+                gridLineWidth[gridLineWidth.length - i] = 1;
+            }
+        }
+
+        simul_opt.scales.xAxes[0].gridLines.color = gridLinesColor;
+        simul_opt.scales.xAxes[0].gridLines.lineWidth = gridLineWidth;
+    }
+
+    function draw_chart() {
+        simul_chart = new Chart(simul_canvas, {
+            type: 'line',
+            data: simul_data,
+            options: simul_opt
+        });
+    }
+</script>
+
+{% endblock %}
